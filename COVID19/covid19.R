@@ -1,3 +1,8 @@
+negToZero = function(x) {
+  x[x < 0] = NA
+  return(x)
+}
+
 # Load the package required to read JSON files.
 source('functions.R')
 forceLibrary(c("rjson", 'dplyr', 'ggplot2'))
@@ -32,21 +37,21 @@ world_data = data %>%  arrange(countriesAndTerritories, year, month, day)
 
 new_world_data = world_data %>% 
   left_join(select(.data = italy_data, dateRep, week)) %>% 
-  mutate(cases_per_population = cases / popData2018, 
-         deaths_per_population = deaths / popData2018, 
+  mutate(cases_per_population = cases / popData2019, 
+         deaths_per_population = deaths / popData2019, 
          deaths_per_cases = deaths / cases)
 
 world_pop = new_world_data %>% 
   filter(!duplicated(countriesAndTerritories)) %>% 
-  select(countriesAndTerritories, popData2018)
-world_pop_sum = world_pop$popData2018  %>% sum(na.rm = T)
+  select(countriesAndTerritories, popData2019)
+world_pop_sum = world_pop$popData2019  %>% sum(na.rm = T)
 
 
 agg_country = new_world_data %>% group_by(countriesAndTerritories) %>% 
-  summarise_if(is.numeric, sum, na.rm = T) %>% select(!popData2018) %>% 
+  summarise_if(is.numeric, sum, na.rm = T) %>% select(!popData2019) %>% 
   left_join(world_pop) %>% 
-  mutate(cases_per_population = cases / popData2018, 
-         deaths_per_population = deaths / popData2018)
+  mutate(cases_per_population = cases / popData2019, 
+         deaths_per_population = deaths / popData2019)
 
 agg_world = new_world_data %>% group_by(dateRep) %>% 
   summarise_if(is.numeric, sum, na.rm = T) %>% 
@@ -72,7 +77,7 @@ top10_cases_countries =
 
 
 agg_country = agg_country %>% 
-  filter(popData2018 > 10^6)
+  filter(popData2019 > 10^6)
 
 agg_country %>% 
   select(countriesAndTerritories, cases_per_population) %>% 
@@ -99,14 +104,27 @@ top10_cases_countries = agg_country %>%
   unlist()
   
 top10_cases = new_world_data %>% 
-  filter(countriesAndTerritories %in% top10_cases_countries)
-
-ggplot(top10_cases, aes(x = week, 
+  filter(countriesAndTerritories %in% top10_cases_countries) %>% 
+  negToZero()
+  
+# top10_cases$deaths_per_population[top10_cases$deaths_per_population < 0] = NA
+# top10_cases$deaths_per_population %>% negToZero() %>% head
+# top10_cases$deaths_per_population < 0] = NA
+# 
+# mutate(cases_per_population = negToZero(cases_per_population),
+#          deaths_per_population = negToZero(deaths_per_population))
+top10_cases %>% 
+  filter(cases_per_population < max(cases_per_population, na.rm = T), 
+         !week %in% c(1:7)) %>% 
+  ggplot(aes(x = week, 
                         y = cases_per_population, 
                         colour = countriesAndTerritories)) + 
   geom_boxplot()
 
-ggplot(top10_cases, aes(x = week, 
+top10_cases %>% 
+  filter(deaths_per_population < max(deaths_per_population, na.rm = T), 
+         !week %in% c(1:7)) %>% 
+  ggplot(aes(x = week, 
                         y = deaths_per_population, 
                         colour = countriesAndTerritories)) + 
   geom_boxplot()
